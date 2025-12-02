@@ -1,0 +1,57 @@
+<resources>
+    <string name="app_name">Stepps</string>
+
+    <!-- Login Activity -->
+    <string name="welcome">Welcome to Stepps!</string>
+    <string name="tagline">Your Daily Fitness Companion</string>
+    <string name="email_hint">Email</string>
+    <string name="password_hint">Password</string>
+    <string name="login_button">Login</string>
+    <string name="register_button">Register</string>
+    <string name="guest_button">Continue as Guest</string>
+    <string name="no_account">Don\'t have an account?</string>
+    <string name="register_now">Register Now</string>
+
+    <!-- Dashboard -->
+    <string name="today_steps">Today\'s Steps</string>
+    <string name="daily_goal">Daily Goal: %1$d/%2$d</string>
+    <string name="calories_burned">Calories Burned</string>
+    <string name="distance">Distance</string>
+    <string name="time_active">Active Time</string>
+    <string name="streak">Day Streak: %1$d</string>
+    <string name="start_tracking">Start Tracking</string>
+    <string name="stop_tracking">Stop Tracking</string>
+    <string name="tracking_active">Tracking Active</string>
+    <string name="tracking_paused">Tracking Paused</string>
+
+    <!-- Motivational Messages -->
+    <string name="msg_great_start">Great start! Keep moving!</string>
+    <string name="msg_halfway">Halfway there! You can do it!</string>
+    <string name="msg_almost">Almost there! Keep going!</string>
+    <string name="msg_goal_achieved">Goal achieved! Amazing work!</string>
+
+    <!-- History -->
+    <string name="history_title">Activity History</string>
+    <string name="weekly_stats">Weekly Statistics</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="total_steps">Total Steps: %1$d</string>
+    <string name="average_steps">Average: %1$d steps/day</string>
+    <string name="best_day">Best Day: %1$d steps</string>
+    <string name="no_history">No activity recorded yet</string>
+
+    <!-- Navigation -->
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_history">History</string>
+
+    <!-- Permissions -->
+    <string name="permission_required">Permissions Required</string>
+    <string name="permission_step_explanation">Stepps needs activity recognition permission to count your steps accurately.</string>
+    <string name="permission_location_explanation">Location permission is used to track walking distance and routes.</string>
+    <string name="grant_permission">Grant Permission</string>
+
+    <!-- Errors -->
+    <string name="error_invalid_email">Please enter a valid email</string>
+    <string name="error_short_password">Password must be at least 6 characters</string>
+    <string name="error_permission_denied">Permission denied. Some features may not work properly.</string>
+</resources>

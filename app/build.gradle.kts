@@ -47,7 +47,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
     // Navigation
@@ -69,9 +68,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
 
+    // Fragment
     implementation("androidx.fragment:fragment-ktx:1.6.1")
 
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    // LocalBroadcastManager (ADDED)
+    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

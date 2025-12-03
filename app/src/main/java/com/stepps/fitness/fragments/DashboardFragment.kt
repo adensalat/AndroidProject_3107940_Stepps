@@ -1,13 +1,13 @@
 package com.stepps.fragments
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,6 +16,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.stepps.DatabaseHelper
 import com.stepps.R
 import com.stepps.StepCounterService
@@ -35,10 +36,19 @@ class DashboardFragment : Fragment() {
     private lateinit var dbHelper: DatabaseHelper
     private var isTracking = false
 
-    // Permission request codes
+    // BroadcastReceiver to listen for step updates
+    private val stepUpdateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "STEP_UPDATE") {
+                loadDashboardData()
+            }
+        }
+    }
+
     companion object {
         private const val PERMISSION_REQUEST_ACTIVITY_RECOGNITION = 100
         private const val PERMISSION_REQUEST_LOCATION = 101
+        const val PERMISSION_REQUEST_CODE = 100
     }
 
     override fun onCreateView(
@@ -56,94 +66,169 @@ class DashboardFragment : Fragment() {
         dbHelper = DatabaseHelper(requireContext())
 
         setupUI()
-        checkPermissions()
+        loadTrackingState()
+
+        if (!checkPermissionsGranted()) {
+            requestPermissions()
+        } else {
+            loadDashboardData()
+            // Start service if tracking was previously active
+            if (isTracking) {
+                startStepService()
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Register broadcast receiver
+        val filter = IntentFilter("STEP_UPDATE")
+        LocalBroadcastManager.getInstance(requireContext())
+            .registerReceiver(stepUpdateReceiver, filter)
+
         loadDashboardData()
-        startDataRefreshLoop()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Unregister broadcast receiver
+        LocalBroadcastManager.getInstance(requireContext())
+            .unregisterReceiver(stepUpdateReceiver)
     }
 
     private fun setupUI() {
-        // Progress ring setup (simplified for milestone 2)
         binding.progressRing.max = 100
         binding.progressRing.progress = 0
 
-        // Start/Stop tracking button
         binding.btnStartStop.setOnClickListener {
-            toggleTracking()
+            if (checkPermissionsGranted()) {
+                toggleTracking()
+            } else {
+                requestPermissions()
+            }
         }
 
-        // Share button - Implicit Intent
         binding.btnShare.setOnClickListener {
             shareProgress()
         }
 
-        // Request permissions automatically when fragment starts
-        if (!checkPermissionsGranted()) {
-            requestPermissions()
-        }
-
-        // Settings button - Navigate to settings (for milestone 3)
         binding.btnSettings.setOnClickListener {
             Toast.makeText(context, "Settings will be available in Milestone 3", Toast.LENGTH_SHORT).show()
         }
     }
 
+    private fun loadTrackingState() {
+        val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+        isTracking = sharedPrefs.getBoolean("is_tracking", false)
+        updateTrackingUI()
+    }
+
+    private fun saveTrackingState() {
+        val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("is_tracking", isTracking).apply()
+    }
+
     private fun toggleTracking() {
         isTracking = !isTracking
+        saveTrackingState()
 
+        if (isTracking) {
+            startStepService()
+            // Save tracking start time
+            val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+            sharedPrefs.edit()
+                .putLong("tracking_start", System.currentTimeMillis())
+                .apply()
+        } else {
+            stopStepService()
+        }
+
+        updateTrackingUI()
+    }
+
+    private fun updateTrackingUI() {
         if (isTracking) {
             binding.btnStartStop.text = getString(R.string.stop_tracking)
             binding.tvTrackingStatus.text = getString(R.string.tracking_active)
             binding.tvTrackingStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.success))
+            binding.statusIndicator.setBackgroundResource(R.drawable.circle_green)
+            binding.statusIndicator.visibility = View.VISIBLE
 
-            // Start service
-            val serviceIntent = Intent(requireContext(), StepCounterService::class.java)
-            serviceIntent.putExtra("start_tracking", true)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                requireContext().startForegroundService(serviceIntent)
-            } else {
-                requireContext().startService(serviceIntent)
-            }
         } else {
             binding.btnStartStop.text = getString(R.string.start_tracking)
             binding.tvTrackingStatus.text = getString(R.string.tracking_paused)
-            binding.tvTrackingStatus.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.holo_green_dark))
-            // Stop service
-            requireContext().stopService(Intent(requireContext(), StepCounterService::class.java))
+            binding.tvTrackingStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
+            binding.statusIndicator.setBackgroundResource(R.drawable.circle_red)
+            binding.statusIndicator.visibility = View.VISIBLE
         }
+
+        // Update current date
+        val dateFormat = java.text.SimpleDateFormat("MMMM dd, yyyy", java.util.Locale.getDefault())
+        binding.tvCurrentDate.text = dateFormat.format(java.util.Date())
+    }
+
+    private fun startStepService() {
+        val serviceIntent = Intent(requireContext(), StepCounterService::class.java)
+        serviceIntent.putExtra("start_tracking", true)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            requireContext().startForegroundService(serviceIntent)
+        } else {
+            requireContext().startService(serviceIntent)
+        }
+    }
+
+    private fun stopStepService() {
+        val serviceIntent = Intent(requireContext(), StepCounterService::class.java)
+        requireContext().stopService(serviceIntent)
     }
 
     private fun loadDashboardData() {
         lifecycleScope.launch {
-            val todayStats = withContext(Dispatchers.IO) {
-                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-                dbHelper.getTodayStats(date)
+            try {
+                val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+
+                // Get current stats from SharedPreferences (real-time from service)
+                val currentSteps = sharedPrefs.getInt("current_steps", 0)
+                val currentCalories = sharedPrefs.getFloat("current_calories", 0f)
+                val currentDistance = sharedPrefs.getFloat("current_distance", 0f)
+                val trackingStart = sharedPrefs.getLong("tracking_start", System.currentTimeMillis())
+
+                val dailyGoal = sharedPrefs.getInt("daily_goal", 10000)
+                val streak = sharedPrefs.getInt("current_streak", 0)
+
+                // Calculate active time
+                val activeTime = if (isTracking) {
+                    System.currentTimeMillis() - trackingStart
+                } else {
+                    0L
+                }
+
+                // Update UI on main thread
+                withContext(Dispatchers.Main) {
+                    binding.tvStepCount.text = currentSteps.toString()
+                    binding.tvGoalProgress.text = getString(R.string.daily_goal, currentSteps, dailyGoal)
+                    binding.tvCalories.text = String.format("%.1f kcal", currentCalories)
+                    binding.tvDistance.text = String.format("%.2f m", currentDistance)
+                    binding.tvTime.text = formatTime(activeTime)
+
+                    // Update progress ring
+                    val progress = if (dailyGoal > 0) {
+                        (currentSteps * 100 / dailyGoal).coerceAtMost(100)
+                    } else {
+                        0
+                    }
+                    binding.progressRing.progress = progress
+
+                    // Update streak
+                    binding.tvStreak.text = getString(R.string.streak, streak)
+
+                    // Update motivational message
+                    updateMotivationalMessage(currentSteps, dailyGoal)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-
-            val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
-            val dailyGoal = sharedPrefs.getInt("daily_goal", 10000)
-
-            // Update UI
-            binding.tvStepCount.text = todayStats.steps.toString()
-            binding.tvGoalProgress.text = getString(R.string.daily_goal, todayStats.steps, dailyGoal)
-            binding.tvCalories.text = String.format("%.1f kcal", todayStats.calories)
-            binding.tvDistance.text = String.format("%.2f m", todayStats.distance)
-            binding.tvTime.text = formatTime(todayStats.time)
-
-            // Update progress ring
-            val progress = if (dailyGoal > 0) {
-                (todayStats.steps * 100 / dailyGoal).coerceAtMost(100)
-            } else {
-                0
-            }
-            binding.progressRing.progress = progress
-
-            // Update streak
-            val streak = sharedPrefs.getInt("current_streak", 0)
-            binding.tvStreak.text = getString(R.string.streak, streak)
-
-            // Update motivational message
-            updateMotivationalMessage(todayStats.steps, dailyGoal)
         }
     }
 
@@ -154,7 +239,7 @@ class DashboardFragment : Fragment() {
             steps < goal / 2 -> "You're making progress!"
             steps < goal * 3 / 4 -> "Halfway there! You can do it!"
             steps < goal -> "Almost there! Keep pushing!"
-            else -> "Goal achieved! Amazing work!"
+            else -> "Goal achieved! Amazing work! 🎉"
         }
 
         binding.tvMotivation.text = message
@@ -169,49 +254,28 @@ class DashboardFragment : Fragment() {
         return String.format("%02d:%02d:%02d", hours, minutes, secs)
     }
 
-    private fun startDataRefreshLoop() {
-        val handler = Handler(Looper.getMainLooper())
-
-        val refreshRunnable = object : Runnable {
-            override fun run() {
-                if (isAdded) {
-                    loadDashboardData()
-                    handler.postDelayed(this, 5000) // Refresh every 5 seconds
-                }
-            }
-        }
-
-        handler.post(refreshRunnable)
-    }
-
-    private fun checkPermissions(): Boolean {
+    private fun checkPermissionsGranted(): Boolean {
         val permissionsNeeded = mutableListOf<String>()
 
-        // Check activity recognition permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             if (ContextCompat.checkSelfPermission(
                     requireContext(),
                     Manifest.permission.ACTIVITY_RECOGNITION
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                permissionsNeeded.add(Manifest.permission.ACTIVITY_RECOGNITION)
+                return false
             }
         }
 
-        // Check location permission
         if (ContextCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            return false
         }
 
-        return permissionsNeeded.isEmpty()
-    }
-
-    private fun checkPermissionsGranted(): Boolean {
-        return checkPermissions()
+        return true
     }
 
     private fun requestPermissions() {
@@ -225,15 +289,18 @@ class DashboardFragment : Fragment() {
         ActivityCompat.requestPermissions(
             requireActivity(),
             permissions.toTypedArray(),
-            PERMISSION_REQUEST_ACTIVITY_RECOGNITION
+            PERMISSION_REQUEST_CODE
         )
     }
 
-    fun onPermissionsResult() {
-        if (checkPermissionsGranted()) {
-            Toast.makeText(context, "Permissions granted!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Some permissions denied", Toast.LENGTH_SHORT).show()
+    fun onPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                Toast.makeText(context, "Permissions granted! You can now start tracking.", Toast.LENGTH_SHORT).show()
+                loadDashboardData()
+            } else {
+                Toast.makeText(context, "Permissions are required for step tracking", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -245,15 +312,16 @@ class DashboardFragment : Fragment() {
 
         val shareMessage = """
             🚶‍♂️ Stepps Progress Update 🚶‍♀️
+            
             Today's Steps: $steps
             Calories Burned: ${String.format("%.1f", calories)} kcal
             Distance: ${String.format("%.2f", distance)} meters
+            
             Keep moving! 💪
             
             #Stepps #FitnessTracker
         """.trimIndent()
 
-        // Implicit Intent for sharing
         val shareIntent = Intent().apply {
             action = Intent.ACTION_SEND
             type = "text/plain"
@@ -261,27 +329,10 @@ class DashboardFragment : Fragment() {
             putExtra(Intent.EXTRA_SUBJECT, "My Stepps Progress")
         }
 
-        // Check if there's an app that can handle this intent
         if (shareIntent.resolveActivity(requireContext().packageManager) != null) {
             startActivity(Intent.createChooser(shareIntent, "Share your progress"))
         } else {
             Toast.makeText(context, "No app available to share", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        when (requestCode) {
-            PERMISSION_REQUEST_ACTIVITY_RECOGNITION -> {
-                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                    Toast.makeText(context, "Permissions granted!", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(context, "Some permissions denied", Toast.LENGTH_SHORT).show()
-                }
-            }
         }
     }
 

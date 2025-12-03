@@ -40,6 +40,15 @@
 
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/tvCurrentDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="Today, Dec 4, 2024"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary" />
+
         <!-- Progress Ring -->
         <RelativeLayout
             android:layout_width="match_parent"
@@ -87,15 +96,33 @@
         </RelativeLayout>
 
         <!-- Tracking Status -->
-        <TextView
-            android:id="@+id/tvTrackingStatus"
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="@string/tracking_paused"
-            android:textSize="16sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="16dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <!-- Status Indicator (Green/Red Dot) -->
+            <View
+                android:id="@+id/statusIndicator"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/circle_green"
+                android:visibility="gone" />
+
+            <!-- Tracking Status (Already exists, just move it here) -->
+            <TextView
+                android:id="@+id/tvTrackingStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/tracking_paused"
+                android:textSize="16sp"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
 
         <!-- Start/Stop Button -->
         <com.google.android.material.button.MaterialButton

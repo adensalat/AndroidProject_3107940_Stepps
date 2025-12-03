@@ -8,16 +8,21 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.stepps.DatabaseHelper
+import com.stepps.LoginActivity
 import com.stepps.R
 import com.stepps.StepCounterService
 import com.stepps.databinding.FragmentDashboardBinding
@@ -35,6 +40,10 @@ class DashboardFragment : Fragment() {
 
     private lateinit var dbHelper: DatabaseHelper
     private var isTracking = false
+
+    // Timer variables
+    private val handler = Handler(Looper.getMainLooper())
+    private var timerRunnable: Runnable? = null
 
     // BroadcastReceiver to listen for step updates
     private val stepUpdateReceiver = object : BroadcastReceiver() {
@@ -75,6 +84,7 @@ class DashboardFragment : Fragment() {
             // Start service if tracking was previously active
             if (isTracking) {
                 startStepService()
+                startTimer()
             }
         }
     }
@@ -87,6 +97,11 @@ class DashboardFragment : Fragment() {
             .registerReceiver(stepUpdateReceiver, filter)
 
         loadDashboardData()
+
+        // Restart timer if tracking
+        if (isTracking) {
+            startTimer()
+        }
     }
 
     override fun onPause() {
@@ -94,6 +109,9 @@ class DashboardFragment : Fragment() {
         // Unregister broadcast receiver
         LocalBroadcastManager.getInstance(requireContext())
             .unregisterReceiver(stepUpdateReceiver)
+
+        // Stop timer updates when fragment is not visible
+        stopTimer()
     }
 
     private fun setupUI() {
@@ -113,8 +131,112 @@ class DashboardFragment : Fragment() {
         }
 
         binding.btnSettings.setOnClickListener {
-            Toast.makeText(context, "Settings will be available in Milestone 3", Toast.LENGTH_SHORT).show()
+            showEditGoalDialog()
         }
+
+        // Make the goal progress text clickable to edit goal
+        binding.tvGoalProgress.setOnClickListener {
+            showEditGoalDialog()
+        }
+
+        // Sign Out button
+        binding.btnSignOut.setOnClickListener {
+            showSignOutDialog()
+        }
+    }
+
+    private fun showSignOutDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Sign Out")
+            .setMessage("Are you sure you want to sign out? Your progress will be saved.")
+            .setPositiveButton("Sign Out") { dialog, _ ->
+                signOut()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun signOut() {
+        // Stop tracking if active
+        if (isTracking) {
+            stopStepService()
+            stopTimer()
+        }
+
+        // Clear login status from SharedPreferences
+        val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+        sharedPrefs.edit()
+            .putBoolean("is_logged_in", false)
+            .putBoolean("is_guest", false)
+            .remove("user_email")
+            .apply()
+
+        // Navigate back to LoginActivity
+        val intent = Intent(requireContext(), LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        requireActivity().finish()
+    }
+
+    private fun showEditGoalDialog() {
+        val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+        val currentGoal = sharedPrefs.getInt("daily_goal", 10000)
+
+        // Create an EditText for input
+        val editText = EditText(requireContext()).apply {
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            hint = "Enter daily step goal"
+            setText(currentGoal.toString())
+            setPadding(50, 40, 50, 40)
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Edit Daily Goal")
+            .setMessage("Set your daily step goal:")
+            .setView(editText)
+            .setPositiveButton("Save") { dialog, _ ->
+                val newGoalText = editText.text.toString()
+                if (newGoalText.isNotEmpty()) {
+                    try {
+                        val newGoal = newGoalText.toInt()
+                        if (newGoal > 0 && newGoal <= 100000) {
+                            // Save to SharedPreferences
+                            sharedPrefs.edit()
+                                .putInt("daily_goal", newGoal)
+                                .apply()
+
+                            // Refresh the dashboard to show new goal
+                            loadDashboardData()
+
+                            Toast.makeText(
+                                requireContext(),
+                                "Daily goal updated to $newGoal steps!",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                requireContext(),
+                                "Please enter a goal between 1 and 100,000 steps",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } catch (e: NumberFormatException) {
+                        Toast.makeText(
+                            requireContext(),
+                            "Please enter a valid number",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
     }
 
     private fun loadTrackingState() {
@@ -139,8 +261,10 @@ class DashboardFragment : Fragment() {
             sharedPrefs.edit()
                 .putLong("tracking_start", System.currentTimeMillis())
                 .apply()
+            startTimer()
         } else {
             stopStepService()
+            stopTimer()
         }
 
         updateTrackingUI()
@@ -165,6 +289,39 @@ class DashboardFragment : Fragment() {
         // Update current date
         val dateFormat = java.text.SimpleDateFormat("MMMM dd, yyyy", java.util.Locale.getDefault())
         binding.tvCurrentDate.text = dateFormat.format(java.util.Date())
+    }
+
+    private fun startTimer() {
+        // Stop any existing timer first
+        stopTimer()
+
+        timerRunnable = object : Runnable {
+            override fun run() {
+                updateTimerDisplay()
+                handler.postDelayed(this, 1000) // Update every second
+            }
+        }
+        handler.post(timerRunnable!!)
+    }
+
+    private fun stopTimer() {
+        timerRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        timerRunnable = null
+    }
+
+    private fun updateTimerDisplay() {
+        val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+        val trackingStart = sharedPrefs.getLong("tracking_start", System.currentTimeMillis())
+
+        val activeTime = if (isTracking) {
+            System.currentTimeMillis() - trackingStart
+        } else {
+            0L
+        }
+
+        binding.tvTime.text = formatTime(activeTime)
     }
 
     private fun startStepService() {
@@ -192,17 +349,9 @@ class DashboardFragment : Fragment() {
                 val currentSteps = sharedPrefs.getInt("current_steps", 0)
                 val currentCalories = sharedPrefs.getFloat("current_calories", 0f)
                 val currentDistance = sharedPrefs.getFloat("current_distance", 0f)
-                val trackingStart = sharedPrefs.getLong("tracking_start", System.currentTimeMillis())
 
                 val dailyGoal = sharedPrefs.getInt("daily_goal", 10000)
                 val streak = sharedPrefs.getInt("current_streak", 0)
-
-                // Calculate active time
-                val activeTime = if (isTracking) {
-                    System.currentTimeMillis() - trackingStart
-                } else {
-                    0L
-                }
 
                 // Update UI on main thread
                 withContext(Dispatchers.Main) {
@@ -210,7 +359,6 @@ class DashboardFragment : Fragment() {
                     binding.tvGoalProgress.text = getString(R.string.daily_goal, currentSteps, dailyGoal)
                     binding.tvCalories.text = String.format("%.1f kcal", currentCalories)
                     binding.tvDistance.text = String.format("%.2f m", currentDistance)
-                    binding.tvTime.text = formatTime(activeTime)
 
                     // Update progress ring
                     val progress = if (dailyGoal > 0) {
@@ -225,6 +373,9 @@ class DashboardFragment : Fragment() {
 
                     // Update motivational message
                     updateMotivationalMessage(currentSteps, dailyGoal)
+
+                    // Update timer display
+                    updateTimerDisplay()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -338,6 +489,7 @@ class DashboardFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        stopTimer()
         _binding = null
     }
 }

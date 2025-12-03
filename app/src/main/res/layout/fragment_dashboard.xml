@@ -152,6 +152,7 @@
                 android:layout_columnWeight="1"
                 android:layout_rowWeight="1"
                 android:layout_margin="8dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp">
 
@@ -160,7 +161,8 @@
                     android:layout_height="match_parent"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:background="@color/white">
 
                     <ImageView
                         android:layout_width="32dp"
@@ -196,6 +198,7 @@
                 android:layout_columnWeight="1"
                 android:layout_rowWeight="1"
                 android:layout_margin="8dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp">
 
@@ -204,7 +207,8 @@
                     android:layout_height="match_parent"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:background="@color/white">
 
                     <ImageView
                         android:layout_width="32dp"
@@ -240,6 +244,7 @@
                 android:layout_columnWeight="1"
                 android:layout_rowWeight="1"
                 android:layout_margin="8dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp">
 
@@ -248,7 +253,8 @@
                     android:layout_height="match_parent"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:background="@color/white">
 
                     <ImageView
                         android:layout_width="32dp"
@@ -284,6 +290,7 @@
                 android:layout_columnWeight="1"
                 android:layout_rowWeight="1"
                 android:layout_margin="8dp"
+                app:cardBackgroundColor="@color/white"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp">
 
@@ -292,7 +299,8 @@
                     android:layout_height="match_parent"
                     android:orientation="vertical"
                     android:gravity="center"
-                    android:padding="16dp">
+                    android:padding="16dp"
+                    android:background="@color/white">
 
                     <ImageView
                         android:layout_width="32dp"
@@ -341,12 +349,26 @@
             android:id="@+id/btnShare"
             android:layout_width="match_parent"
             android:layout_height="56dp"
+            android:layout_marginBottom="16dp"
             android:text="Share Progress"
             android:textSize="16sp"
             android:drawableStart="@android:drawable/ic_menu_share"
             android:drawablePadding="8dp"
             app:cornerRadius="12dp"
             app:backgroundTint="@color/accent" />
+
+        <!-- Sign Out Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSignOut"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Sign Out"
+            android:textSize="16sp"
+            android:textColor="@color/error"
+            app:cornerRadius="12dp"
+            app:backgroundTint="@android:color/transparent"
+            app:strokeColor="@color/error"
+            app:strokeWidth="2dp" />
 
     </LinearLayout>
 

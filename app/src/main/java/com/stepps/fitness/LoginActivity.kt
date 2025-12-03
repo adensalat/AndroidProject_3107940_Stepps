@@ -33,6 +33,9 @@ class LoginActivity : AppCompatActivity() {
             val password = binding.etPassword.text.toString().trim()
 
             if (validateInput(email, password)) {
+                // Reset step data for new user
+                resetStepData()
+
                 // Simulate login - In milestone 3, add actual authentication
                 sharedPrefs.edit()
                     .putString("user_email", email)
@@ -60,6 +63,9 @@ class LoginActivity : AppCompatActivity() {
 
         // Guest Button - Continue without account
         binding.btnGuest.setOnClickListener {
+            // Reset step data for guest user
+            resetStepData()
+
             sharedPrefs.edit()
                 .putBoolean("is_guest", true)
                 .apply()
@@ -83,6 +89,20 @@ class LoginActivity : AppCompatActivity() {
                 Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun resetStepData() {
+        // Clear all step-related data from SharedPreferences
+        sharedPrefs.edit()
+            .putInt("current_steps", 0)
+            .putFloat("current_calories", 0f)
+            .putFloat("current_distance", 0f)
+            .putLong("tracking_start", System.currentTimeMillis())
+            .putBoolean("is_tracking", false)
+            .putInt("current_streak", 0)
+            .putBoolean("achievement_1k", false)
+            .putBoolean("achievement_10k", false)
+            .apply()
     }
 
     private fun validateInput(email: String, password: String): Boolean {

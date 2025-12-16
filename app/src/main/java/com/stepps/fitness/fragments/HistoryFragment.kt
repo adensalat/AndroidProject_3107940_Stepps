@@ -1,5 +1,6 @@
 package com.stepps.fragments
 
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -59,13 +60,38 @@ class HistoryFragment : Fragment() {
         }
     }
 
+    private fun getCurrentUserId(): Long {
+        val sharedPrefs = requireContext().getSharedPreferences("SteppsPrefs", Context.MODE_PRIVATE)
+        val userId = sharedPrefs.getLong("user_id", -1)
+        val isGuest = sharedPrefs.getBoolean("is_guest", false)
+
+        // Return -1 for guest, otherwise return the actual user ID
+        return if (isGuest) -1 else userId
+    }
+
     private fun loadHistoryData() {
         lifecycleScope.launch {
             binding.progressBar.visibility = View.VISIBLE
 
+            // Get current user ID
+            val userId = getCurrentUserId()
+
+            // For guest users, show empty state
+            if (userId == -1L) {
+                withContext(Dispatchers.Main) {
+                    binding.tvTotalSteps.text = getString(R.string.total_steps, 0)
+                    binding.tvAverageSteps.text = getString(R.string.average_steps, 0)
+                    binding.tvBestDay.text = getString(R.string.best_day, 0)
+                    binding.tvEmptyState.visibility = View.VISIBLE
+                    binding.tvEmptyState.text = "Login to save your history"
+                    binding.rvHistory.visibility = View.GONE
+                    binding.progressBar.visibility = View.GONE
+                }
+                return@launch
+            }
+
             val weeklyStats = withContext(Dispatchers.IO) {
-                // Convert the database result to the correct type
-                dbHelper.getWeeklyStats().map { stats ->
+                dbHelper.getWeeklyStats(userId).map { stats ->
                     DailyStats(
                         date = stats.date,
                         steps = stats.steps,
@@ -92,8 +118,9 @@ class HistoryFragment : Fragment() {
                 binding.progressBar.visibility = View.GONE
 
                 // Show/hide empty state
-                if (weeklyStats.all { it.steps == 0 }) {
+                if (weeklyStats.isEmpty() || weeklyStats.all { it.steps == 0 }) {
                     binding.tvEmptyState.visibility = View.VISIBLE
+                    binding.tvEmptyState.text = "No activity recorded yet"
                     binding.rvHistory.visibility = View.GONE
                 } else {
                     binding.tvEmptyState.visibility = View.GONE
@@ -105,9 +132,23 @@ class HistoryFragment : Fragment() {
 
     private fun exportData() {
         lifecycleScope.launch {
+            // Get current user ID
+            val userId = getCurrentUserId()
+
+            if (userId == -1L) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Login to export your data",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                return@launch
+            }
+
             val weeklyStats = withContext(Dispatchers.IO) {
-                // Convert the database result to the correct type
-                dbHelper.getWeeklyStats().map { stats ->
+                // Convert the database result to the correct type with userId
+                dbHelper.getWeeklyStats(userId).map { stats ->
                     DailyStats(
                         date = stats.date,
                         steps = stats.steps,

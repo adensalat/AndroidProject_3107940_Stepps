@@ -1,12 +1,12 @@
 package com.stepps
 
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.stepps.databinding.ActivityMainBinding
@@ -26,27 +26,43 @@ class MainActivity : AppCompatActivity() {
 
         setupNavigation()
         startStepCounterService()
+        loadUserStepsFromDatabase()
         checkAchievements()
     }
 
     private fun setupNavigation() {
         val navView: BottomNavigationView = binding.navView
-
-        // Get NavHostFragment properly
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment_activity_main) as NavHostFragment
         val navController = navHostFragment.navController
 
-        // Passing each menu ID as a set of Ids because each menu should be considered as top level destinations
         val appBarConfiguration = AppBarConfiguration(
             setOf(
                 R.id.navigation_dashboard,
                 R.id.navigation_history
             )
         )
-
-        //setupActionBarWithNavController(navController, appBarConfiguration)
         navView.setupWithNavController(navController)
+    }
+
+    private fun loadUserStepsFromDatabase() {
+        val userId = getCurrentUserId()
+        if (userId == -1L) return // Guest user
+
+        // Load today's steps from database
+        val todayStats = dbHelper.getTodayStats(userId)
+
+        sharedPrefs.edit()
+            .putInt("current_steps", todayStats.steps)
+            .putFloat("current_calories", todayStats.calories.toFloat())
+            .putFloat("current_distance", todayStats.distance.toFloat())
+            .apply()
+    }
+
+    private fun getCurrentUserId(): Long {
+        val userId = sharedPrefs.getLong("user_id", -1)
+        val isGuest = sharedPrefs.getBoolean("is_guest", false)
+        return if (isGuest) -1 else userId
     }
 
     private fun startStepCounterService() {
@@ -62,21 +78,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAchievements() {
-        // Check and unlock achievements based on user progress
-        val totalSteps = dbHelper.getTotalSteps()
+        val userId = getCurrentUserId()
+        if (userId == -1L) return // Guest user
+
+        val totalSteps = dbHelper.getTotalSteps(userId)
 
         if (totalSteps >= 1000) {
-            dbHelper.unlockAchievement(1) // First 1K Steps
+            dbHelper.unlockAchievement(userId, 1)
         }
-
         if (totalSteps >= 10000) {
-            dbHelper.unlockAchievement(2) // 10K Master
+            dbHelper.unlockAchievement(userId, 2)
         }
 
-        // Check streak (simplified for milestone 2)
         val streak = sharedPrefs.getInt("current_streak", 0)
         if (streak >= 7) {
-            dbHelper.unlockAchievement(3) // Week Streak
+            dbHelper.unlockAchievement(userId, 3)
         }
     }
 
@@ -87,19 +103,14 @@ class MainActivity : AppCompatActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-        // Get the NavHostFragment
         val navHostFragment = supportFragmentManager
             .findFragmentById(R.id.nav_host_fragment_activity_main) as? NavHostFragment
-
-        // Get the current fragment from NavHostFragment
         val currentFragment = navHostFragment?.childFragmentManager?.primaryNavigationFragment
 
-        // Forward permission result to current fragment if it's DashboardFragment
         if (currentFragment is DashboardFragment) {
             currentFragment.onPermissionsResult(requestCode, permissions, grantResults)
         }
 
-        // Alternatively, forward to all fragments in the NavHostFragment
         navHostFragment?.childFragmentManager?.fragments?.forEach { fragment ->
             if (fragment is DashboardFragment && fragment.isVisible) {
                 fragment.onPermissionsResult(requestCode, permissions, grantResults)

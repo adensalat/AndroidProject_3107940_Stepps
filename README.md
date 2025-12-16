@@ -39,29 +39,6 @@ A simple, motivational fitness app that helps users stay active by tracking thei
 - **Shared Preferences**: Saves app settings and user preferences
 - **Local-First**: All data stored locally for privacy
 
-## 🏗️ Project Structure
-com.stepps.fitness/
-├── LoginActivity.java # Login/Registration screen
-├── MainActivity.java # Main container with bottom navigation
-├── StepCounterService.java # Background service for step counting
-│
-├── fragments/
-│ ├── DashboardFragment.java # Home screen with live stats
-│ ├── HistoryFragment.java # Activity history and statistics
-│ ├── GoalsFragment.java # Goals and achievements
-│ └── SettingsFragment.java # App settings and preferences
-│
-├── database/
-│ └── DatabaseHelper.java # SQLite database management
-│
-├── adapters/
-│ ├── HistoryAdapter.java # RecyclerView adapter for history
-│ └── AchievementAdapter.java # RecyclerView adapter for badges
-│
-└── models/
-└── Achievement.java # Achievement data model
-
-text
 
 ## ⚙️ Setup Instructions
 
@@ -89,34 +66,7 @@ text
 - `ic_badge_unlocked.xml` (Unlocked badge)
 - `circular_progress.xml` (Circular progress drawable)
 
-### Example `circular_progress.xml`:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
- <item>
-     <shape android:shape="ring"
-         android:thicknessRatio="16"
-         android:useLevel="false">
-         <solid android:color="#E0E0E0"/>
-     </shape>
- </item>
- <item>
-     <shape android:shape="ring"
-         android:thicknessRatio="16"
-         android:useLevel="true">
-         <solid android:color="@color/primary"/>
-     </shape>
- </item>
-</layer-list>
-Add to build.gradle (Project level):
-gradle
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url 'https://jitpack.io' }
-    }
-}
+
 Grant Permissions (on first run):
 Activity Recognition
 
